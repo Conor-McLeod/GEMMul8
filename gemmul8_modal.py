@@ -1,12 +1,14 @@
 """Run GEMMul8 serverlessly on Modal.
 
 This tooling lives on its own branch (modal-tooling) and is pointed at any GEMMul8
-checkout via GEMMUL8_SRC, so library branches never contain it:
+checkout via GEMMUL8_SRC, so library branches never contain it. Modal is pinned in
+this folder's uv project (pyproject.toml / uv.lock), so run everything through `uv run`:
 
     export GEMMUL8_SRC=../GEMMul8                 # or an agent's worktree
-    modal run gemmul8_modal.py::main              # build image, run samples + a DGEMM check
-    modal run gemmul8_modal.py::profile           # Nsight Systems trace -> Volume gemmul8-profiles
-    modal deploy gemmul8_modal.py                 # expose `dgemm` (bakes in GEMMUL8_SRC as of deploy)
+    uv run modal run gemmul8_modal.py::main       # build image, run samples + a DGEMM check
+    uv run modal run gemmul8_modal.py::profile    # Nsight Systems trace -> Volume gemmul8-profiles
+    uv run modal deploy gemmul8_modal.py          # expose `dgemm` (bakes in GEMMUL8_SRC as of deploy)
+    uv run modal volume ls gemmul8-profiles       # list saved reports
 
 The library is compiled for ONE GPU arch (Makefile uses a single -gencode), so
 GPU and GPU_ARCH below must match.
@@ -67,7 +69,7 @@ image = (
 
 app = modal.App("gemmul8", image=image)
 
-# Nsight Systems reports persist here; browse with `modal volume ls gemmul8-profiles`.
+# Nsight Systems reports persist here; browse with `uv run modal volume ls gemmul8-profiles`.
 profiles = modal.Volume.from_name("gemmul8-profiles", create_if_missing=True)
 PROFILE_DIR = "/profiles"
 
@@ -165,7 +167,7 @@ def src_revision() -> str:
 @app.local_entrypoint()
 def profile(n: int = 4096, iters: int = 5, num_moduli: int = 15, accurate: bool = False,
             label: str = ""):
-    """modal run gemmul8_modal.py::profile --n 8192"""
+    """uv run modal run gemmul8_modal.py::profile --n 8192"""
     label = label or f"dgemm_int8_n{n}_mod{num_moduli}_{'accu' if accurate else 'fast'}_{GPU}"
     label = f"{label}_{src_revision()}"
     bench_args = ["--n", str(n), "--iters", str(iters), "--num-moduli", str(num_moduli)]
@@ -174,7 +176,7 @@ def profile(n: int = 4096, iters: int = 5, num_moduli: int = 15, accurate: bool 
     result = nsys_profile.remote(label, bench_args)
     print(result["stats"])
     print(f"report on Volume gemmul8-profiles: {result['report']}\n"
-          f"fetch with: modal volume get gemmul8-profiles {result['report']}")
+          f"fetch with: uv run modal volume get gemmul8-profiles {result['report']}")
 
 
 @app.local_entrypoint()
